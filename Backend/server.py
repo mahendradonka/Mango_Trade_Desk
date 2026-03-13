@@ -565,5 +565,5 @@ class MangoHandler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     init_db()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), MangoHandler)
-    print(f\"Mango backend running on http://localhost:{PORT}\")
+    print(f"Mango backend running on http://localhost:{PORT}")
     server.serve_forever()
