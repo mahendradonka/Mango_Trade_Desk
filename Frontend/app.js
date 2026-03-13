@@ -30,6 +30,7 @@ const elements = {
   statVarieties: document.getElementById("statVarieties"),
   statReceipts: document.getElementById("statReceipts"),
   printReceipt: document.getElementById("printReceipt"),
+  sharePdf: document.getElementById("sharePdf"),
   shareWhatsapp: document.getElementById("shareWhatsapp"),
   shareEmail: document.getElementById("shareEmail"),
   loginOverlay: document.getElementById("loginOverlay"),
@@ -512,6 +513,83 @@ function receiptToText(receipt) {
     .join("\n");
 }
 
+function buildReceiptPdf(receipt) {
+  const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+  const left = 40;
+  let y = 50;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Mango Trade Desk - Receipt", left, y);
+  y += 28;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text(`Date: ${receipt.date}`, left, y);
+  y += 18;
+  doc.text(`Farmer: ${receipt.farmer}`, left, y);
+  y += 18;
+  if (receipt.phone) {
+    doc.text(`Phone: ${receipt.phone}`, left, y);
+    y += 18;
+  }
+
+  y += 10;
+  doc.setFont("helvetica", "bold");
+  doc.text("Items", left, y);
+  y += 16;
+  doc.setFont("helvetica", "normal");
+
+  receipt.lines.forEach((line) => {
+    const row = `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg x Rs${line.price} = Rs${line.total.toFixed(0)}`;
+    const split = doc.splitTextToSize(row, 520);
+    doc.text(split, left, y);
+    y += split.length * 14 + 6;
+    if (y > 760) {
+      doc.addPage();
+      y = 50;
+    }
+  });
+
+  y += 10;
+  doc.setFont("helvetica", "bold");
+  doc.text(`Gross: Rs${receipt.gross.toFixed(0)}`, left, y);
+  y += 16;
+  doc.text(`Deduction (5%): Rs${receipt.deduction.toFixed(0)}`, left, y);
+  y += 16;
+  doc.text(`Advance: Rs${receipt.advance.toFixed(0)}`, left, y);
+  y += 16;
+  doc.text(`Net Payable: Rs${receipt.net.toFixed(0)}`, left, y);
+
+  return doc;
+}
+
+async function shareOrDownloadPdf(receipt) {
+  if (!window.jspdf) {
+    alert("PDF library not loaded yet. Please refresh.");
+    return;
+  }
+  const doc = buildReceiptPdf(receipt);
+  const pdfBlob = doc.output("blob");
+  const fileName = `receipt-${receipt.date}-${receipt.farmer.replace(/\s+/g, "_")}.pdf`;
+  const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `Mango Receipt - ${receipt.date}`,
+        text: "Receipt PDF",
+      });
+      return;
+    } catch (err) {
+      // Fall back to download if share is canceled or fails.
+    }
+  }
+
+  doc.save(fileName);
+}
+
 function useFarmerByName(name) {
   const farmer = state.farmers.find((item) => item.name === name);
   if (!farmer) {
@@ -699,6 +777,11 @@ function bindEvents() {
       popup.document.write(`<pre>${text}</pre>`);
       popup.print();
     }
+  });
+
+  elements.sharePdf.addEventListener("click", async () => {
+    const receipt = buildReceiptPayload();
+    await shareOrDownloadPdf(receipt);
   });
 
   elements.shareWhatsapp.addEventListener("click", () => {
