@@ -1,0 +1,383 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mango Trade Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <h2>Welcome back</h2>
+      <p>Sign in to access Mango Trade Desk.</p>
+      <form id="loginForm" class="form-card">
+        <label>
+          Username
+          <input type="text" id="loginUser" placeholder="admin" required />
+        </label>
+        <label>
+          PIN
+          <input type="password" id="loginPin" placeholder="4 digits" required />
+        </label>
+        <button class="btn primary" type="submit">Login</button>
+      </form>
+      <div class="login-helper">
+        <button class="btn ghost" type="button" id="togglePinForm">Set / Change PIN</button>
+      </div>
+      <form id="pinForm" class="form-card hidden">
+        <label>
+          New PIN
+          <input type="password" id="newPin" placeholder="New PIN" />
+        </label>
+        <label>
+          Confirm PIN
+          <input type="password" id="confirmPin" placeholder="Confirm PIN" />
+        </label>
+        <button class="btn secondary" type="submit">Save PIN</button>
+      </form>
+      <p class="login-note" id="loginNote"></p>
+    </div>
+  </div>
+
+  <div class="bg-blobs" aria-hidden="true">
+    <span class="blob one"></span>
+    <span class="blob two"></span>
+    <span class="blob three"></span>
+  </div>
+
+  <div class="layout">
+    <aside class="side-nav">
+      <div class="brand">
+        <span class="brand-mark">M</span>
+        <div>
+          <div class="brand-title">Mango Trade Desk</div>
+          <div class="brand-sub">Buyer Console</div>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <button class="nav-link active" data-view="dashboard">Dashboard</button>
+        <button class="nav-link" data-view="farmers">Farmers</button>
+        <button class="nav-link" data-view="varieties">Varieties & Prices</button>
+        <button class="nav-link" data-view="settings">Settings</button>
+      </nav>
+      <div class="nav-footer">
+        <div class="user-pill" id="currentUser">Logged in as: admin</div>
+        <button class="btn ghost" type="button" id="logoutBtn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Daily Desk</h1>
+          <p>Track trade, update prices, and issue farmer receipts fast.</p>
+        </div>
+        <div class="topbar-actions">
+          <label class="date-pill">
+            <span>Price Date</span>
+            <input type="date" id="priceDate" />
+          </label>
+          <button class="btn primary" id="saveConfigBtn">Save Daily Prices</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-dashboard" data-view="dashboard">
+        <div class="hero">
+          <div class="hero-content">
+            <p class="eyebrow">Mango Buyer Console</p>
+            <h2>Mango Trade Desk</h2>
+            <p class="subtitle">
+              Track varieties, daily prices, grades, and farmer receipts in one place.
+              Built for fast crate-by-crate calculations.
+            </p>
+          </div>
+          <div class="hero-card">
+            <h2>Today at a glance</h2>
+            <div class="stat-grid" id="dailyStats">
+              <div class="stat">
+                <span class="stat-label">Varieties</span>
+                <span class="stat-value" id="statVarieties">0</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Grades</span>
+                <span class="stat-value">3</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Saved Receipts</span>
+                <span class="stat-value" id="statReceipts">0</span>
+              </div>
+            </div>
+            <div class="stat-note">All calculations auto-apply a 5% deduction.</div>
+          </div>
+        </div>
+
+        <div class="view-body">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Farmer receipt builder</h2>
+                <p>Add each variety and grade the farmer brought. The receipt totals update instantly.</p>
+              </div>
+            </div>
+
+            <form id="receiptForm" class="form-card">
+              <div class="grid three">
+                <label>
+                  Select farmer
+                  <select id="farmerSelect"></select>
+                </label>
+                <label>
+                  Farmer name
+                  <input type="text" id="farmerName" placeholder="Farmer A" required />
+                </label>
+                <label>
+                  Phone / WhatsApp
+                  <input type="text" id="farmerPhone" placeholder="+91..." />
+                </label>
+                <label>
+                  Advance paid (Rs)
+                  <input type="number" id="advancePaid" min="0" step="1" value="0" />
+                </label>
+              </div>
+
+              <div class="line-items" id="lineItems"></div>
+              <button class="btn ghost" type="button" id="addLineBtn">Add mango line</button>
+
+              <div class="receipt-summary">
+                <div>
+                  <div class="summary-row">
+                    <span>Gross total</span>
+                    <strong id="grossTotal">Rs 0</strong>
+                  </div>
+                  <div class="summary-row">
+                    <span>5% deduction</span>
+                    <strong id="deductionTotal">Rs 0</strong>
+                  </div>
+                  <div class="summary-row">
+                    <span>Advance paid</span>
+                    <strong id="advanceTotal">Rs 0</strong>
+                  </div>
+                </div>
+                <div class="summary-total">
+                  <span>Net payable</span>
+                  <strong id="netTotal">Rs 0</strong>
+                </div>
+              </div>
+
+              <div class="receipt-actions">
+                <button class="btn primary" type="submit">Save receipt</button>
+                <button class="btn secondary" type="button" id="printReceipt">Print</button>
+                <button class="btn ghost" type="button" id="shareWhatsapp">Share WhatsApp</button>
+                <button class="btn ghost" type="button" id="shareEmail">Share Email</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Receipt history</h2>
+                <p>Saved receipts for this date.</p>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Farmer</th>
+                    <th>Lines</th>
+                    <th>Gross</th>
+                    <th>Deduction</th>
+                    <th>Advance</th>
+                    <th>Net</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-farmers" data-view="farmers">
+        <div class="view-body">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Farmer list</h2>
+                <p>Add farmers once and reuse their details in receipts.</p>
+              </div>
+            </div>
+            <div class="grid two">
+              <form id="farmerForm" class="form-card">
+                <label>
+                  Farmer name
+                  <input type="text" id="farmerListName" placeholder="Farmer A" required />
+                </label>
+                <label>
+                  Village
+                  <input type="text" id="farmerVillage" placeholder="Village name" />
+                </label>
+                <label>
+                  Phone / WhatsApp
+                  <input type="text" id="farmerListPhone" placeholder="+91..." />
+                </label>
+                <label>
+                  Notes
+                  <input type="text" id="farmerNotes" placeholder="Extra info" />
+                </label>
+                <button class="btn secondary" type="submit">Add / Update Farmer</button>
+              </form>
+              <div class="table-card">
+                <div class="table-title">Saved farmers</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Village</th>
+                      <th>Phone</th>
+                      <th>Use</th>
+                    </tr>
+                  </thead>
+                  <tbody id="farmerTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-varieties" data-view="varieties">
+        <div class="view-body">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Varieties & crate weights</h2>
+                <p>Set the average crate weight per variety. These can be adjusted any day.</p>
+              </div>
+            </div>
+            <div class="grid two">
+              <form id="varietyForm" class="form-card">
+                <label>
+                  Variety name
+                  <input type="text" id="varietyName" placeholder="Banginapalli" required />
+                </label>
+                <label>
+                  Avg crate weight (kg)
+                  <input type="number" id="varietyWeight" min="1" step="0.1" required />
+                </label>
+                <button class="btn secondary" type="submit">Add / Update Variety</button>
+              </form>
+              <div class="table-card">
+                <div class="table-title">Current varieties</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Variety</th>
+                      <th>Avg crate weight (kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="varietyTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Daily prices by grade</h2>
+                <p>Enter the price per kg for each grade. These can change daily.</p>
+              </div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Variety</th>
+                    <th>Grade A</th>
+                    <th>Grade B</th>
+                    <th>Grade C</th>
+                  </tr>
+                </thead>
+                <tbody id="priceTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-settings" data-view="settings">
+        <div class="view-body">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Settings</h2>
+                <p>Security and daily workflow options.</p>
+              </div>
+            </div>
+            <div class="grid two">
+              <div class="form-card">
+                <h3>Login & PIN</h3>
+                <p class="subtitle">Update your PIN and access control anytime.</p>
+                <button class="btn secondary" type="button" id="openPinSettings">Update PIN</button>
+              </div>
+              <div class="form-card">
+                <h3>Data storage</h3>
+                <p class="subtitle">Laptop mode keeps data on this computer. When you go multi-device, we will host the backend.</p>
+                <div class="settings-note">Database: Local SQLite in `Database/mango.db`.</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div>
+      Mango Trade Desk keeps everything simple and local-first. No internet required for daily work.
+    </div>
+  </footer>
+
+  <template id="lineTemplate">
+    <div class="line-item">
+      <label>
+        Variety
+        <select class="line-variety"></select>
+      </label>
+      <label>
+        Grade
+        <select class="line-grade">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </label>
+      <label>
+        Crates
+        <input type="number" class="line-crates" min="1" step="1" value="1" />
+      </label>
+      <label>
+        Avg crate weight (kg)
+        <input type="number" class="line-weight" min="1" step="0.1" />
+      </label>
+      <label>
+        Price / kg (Rs)
+        <input type="number" class="line-price" min="1" step="1" />
+      </label>
+      <div class="line-total">
+        <span>Line total</span>
+        <strong class="line-total-value">Rs 0</strong>
+        <button class="btn danger" type="button">Remove</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
