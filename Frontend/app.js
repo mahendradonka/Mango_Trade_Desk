@@ -24,8 +24,6 @@ const elements = {
   advancePaid: document.getElementById("advancePaid"),
   transportCharge: document.getElementById("transportCharge"),
   unloadingCharge: document.getElementById("unloadingCharge"),
-  grossTotal: document.getElementById("grossTotal"),
-  deductionTotal: document.getElementById("deductionTotal"),
   advanceTotal: document.getElementById("advanceTotal"),
   transportTotal: document.getElementById("transportTotal"),
   unloadingTotal: document.getElementById("unloadingTotal"),
@@ -52,8 +50,6 @@ const elements = {
   receiptPreviewTable: document.getElementById("receiptPreviewTable"),
   receiptDateText: document.getElementById("receiptDateText"),
   receiptFarmerText: document.getElementById("receiptFarmerText"),
-  receiptGrossText: document.getElementById("receiptGrossText"),
-  receiptDeductionText: document.getElementById("receiptDeductionText"),
   receiptAdvanceText: document.getElementById("receiptAdvanceText"),
   receiptTransportText: document.getElementById("receiptTransportText"),
   receiptUnloadingText: document.getElementById("receiptUnloadingText"),
@@ -428,15 +424,11 @@ function createLineItem(data) {
 
 function updateTotals() {
   const receipt = buildReceiptPayload();
-  const gross = receipt.gross;
-  const deduction = receipt.deduction;
   const advance = receipt.advance;
   const transport = receipt.transport;
   const unloading = receipt.unloading;
   const net = receipt.net;
 
-  elements.grossTotal.textContent = formatRs(gross);
-  elements.deductionTotal.textContent = formatRs(deduction);
   elements.advanceTotal.textContent = formatRs(advance);
   elements.transportTotal.textContent = formatRs(transport);
   elements.unloadingTotal.textContent = formatRs(unloading);
@@ -454,9 +446,6 @@ function renderHistory() {
       <tr>
         <td>${receipt.farmer}</td>
         <td>${receipt.lines.length}</td>
-        <td>${formatRs(receipt.gross)}</td>
-        <td>${formatRs(receipt.deduction)}</td>
-        <td>${formatRs(receipt.advance)}</td>
         <td>${formatRs(receipt.net)}</td>
       </tr>
     `
@@ -503,7 +492,8 @@ function buildReceiptPayload() {
   const advance = Number(elements.advancePaid.value || 0);
   const transport = Number(elements.transportCharge.value || 0);
   const unloading = Number(elements.unloadingCharge.value || 0);
-  const net = Math.max(gross - deduction - advance - transport - unloading, 0);
+  const subtotal = lines.reduce((sum, line) => sum + line.totalNet, 0);
+  const net = Math.max(subtotal - advance - transport - unloading, 0);
 
   return {
     farmer: elements.farmerName.value.trim() || "Unknown",
@@ -512,6 +502,7 @@ function buildReceiptPayload() {
     lines,
     gross,
     deduction,
+    subtotal,
     advance,
     transport,
     unloading,
@@ -534,8 +525,6 @@ function receiptToText(receipt) {
     "",
     lines,
     "",
-    `Gross: Rs${receipt.gross.toFixed(0)}`,
-    `Deduction (5%): Rs${receipt.deduction.toFixed(0)}`,
     `Advance: Rs${receipt.advance.toFixed(0)}`,
     `Transport: Rs${receipt.transport.toFixed(0)}`,
     `Unloading: Rs${receipt.unloading.toFixed(0)}`,
@@ -549,8 +538,6 @@ function renderReceiptPreview() {
   const receipt = buildReceiptPayload();
   elements.receiptDateText.textContent = receipt.date;
   elements.receiptFarmerText.textContent = receipt.farmer;
-  elements.receiptGrossText.textContent = formatRs(receipt.gross);
-  elements.receiptDeductionText.textContent = formatRs(receipt.deduction);
   elements.receiptAdvanceText.textContent = formatRs(receipt.advance);
   elements.receiptTransportText.textContent = formatRs(receipt.transport);
   elements.receiptUnloadingText.textContent = formatRs(receipt.unloading);
@@ -651,10 +638,6 @@ function buildReceiptPdf(receipt) {
 
   y += 10;
   doc.setFont("helvetica", "bold");
-  doc.text(`Gross: Rs${receipt.gross.toFixed(0)}`, left, y);
-  y += 16;
-  doc.text(`Deduction (5%): Rs${receipt.deduction.toFixed(0)}`, left, y);
-  y += 16;
   doc.text(`Advance: Rs${receipt.advance.toFixed(0)}`, left, y);
   y += 16;
   doc.text(`Transport: Rs${receipt.transport.toFixed(0)}`, left, y);
