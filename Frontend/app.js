@@ -67,6 +67,8 @@ const defaultVarieties = [
   { name: "Totapuri", avgWeight: 22 },
 ];
 
+const lastWeightByVariety = {};
+
 let storageMode = "local";
 let state = {
   varieties: [],
@@ -382,7 +384,11 @@ function createLineItem(data) {
   varietySelect.innerHTML = buildVarietyOptions(data?.variety || state.varieties[0]?.name);
   gradeSelect.value = data?.grade || "A";
   cratesInput.value = data?.crates || 1;
-  weightInput.value = data?.weight || getAvgWeight(varietySelect.value);
+  const initialWeight =
+    data?.weight ||
+    lastWeightByVariety[varietySelect.value] ||
+    getAvgWeight(varietySelect.value);
+  weightInput.value = initialWeight;
   priceInput.value = data?.price || getPrice(varietySelect.value, gradeSelect.value);
 
   function updateLine() {
@@ -399,7 +405,8 @@ function createLineItem(data) {
   }
 
   varietySelect.addEventListener("change", () => {
-    weightInput.value = getAvgWeight(varietySelect.value);
+    const cached = lastWeightByVariety[varietySelect.value];
+    weightInput.value = cached || getAvgWeight(varietySelect.value);
     priceInput.value = getPrice(varietySelect.value, gradeSelect.value);
     updateLine();
   });
@@ -409,9 +416,11 @@ function createLineItem(data) {
     updateLine();
   });
 
-  [cratesInput, weightInput, priceInput].forEach((input) =>
-    input.addEventListener("input", updateLine)
-  );
+  [cratesInput, priceInput].forEach((input) => input.addEventListener("input", updateLine));
+  weightInput.addEventListener("input", () => {
+    lastWeightByVariety[varietySelect.value] = Number(weightInput.value || 0);
+    updateLine();
+  });
 
   removeBtn.addEventListener("click", () => {
     line.remove();
@@ -546,7 +555,7 @@ function renderReceiptPreview() {
   if (!receipt.lines.length) {
     elements.receiptPreviewTable.innerHTML = `
       <tr>
-        <td colspan="9">No line items yet.</td>
+        <td colspan="10">No line items yet.</td>
       </tr>
     `;
     return;
@@ -557,6 +566,7 @@ function renderReceiptPreview() {
       (line, index) => `
       <tr>
         <td>${index + 1}</td>
+        <td>${line.variety}</td>
         <td>${line.grade}</td>
         <td>${line.crates}</td>
         <td>${formatWeight4(line.weight)}</td>
@@ -598,8 +608,8 @@ function buildReceiptPdf(receipt) {
   y += 16;
   doc.setFont("helvetica", "normal");
 
-  const colWidths = [28, 42, 44, 58, 62, 60, 52, 46, 56];
-  const headers = ["No", "Grade", "Crates", "Avg Wt", "Total", "Deduct", "Net", "Rate", "Rs"];
+  const colWidths = [26, 70, 40, 44, 56, 58, 56, 48, 40, 54];
+  const headers = ["No", "Variety", "Grade", "Crates", "Avg Wt", "Total", "Deduct", "Net", "Rate", "Rs"];
 
   const drawRow = (row, rowY, isHeader = false) => {
     let x = left;
@@ -617,6 +627,7 @@ function buildReceiptPdf(receipt) {
   receipt.lines.forEach((line, index) => {
     const row = [
       index + 1,
+      line.variety,
       line.grade,
       line.crates,
       formatWeight4(line.weight),
