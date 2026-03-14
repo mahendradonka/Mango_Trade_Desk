@@ -156,15 +156,7 @@
               <button class="btn ghost" type="button" id="addLineBtn">Add mango line</button>
 
               <div class="receipt-summary">
-                <div>
-                  <div class="summary-row">
-                    <span>Gross total</span>
-                    <strong id="grossTotal">Rs 0</strong>
-                  </div>
-                  <div class="summary-row">
-                    <span>5% deduction</span>
-                    <strong id="deductionTotal">Rs 0</strong>
-                  </div>
+          <div>
             <div class="summary-row">
               <span>Advance paid</span>
               <strong id="advanceTotal">Rs 0</strong>
@@ -233,8 +225,6 @@
         </div>
         <div class="receipt-footer">
           <div>
-            <div>Gross: <strong id="receiptGrossText">Rs 0</strong></div>
-            <div>Deduction (5%): <strong id="receiptDeductionText">Rs 0</strong></div>
             <div>Advance: <strong id="receiptAdvanceText">Rs 0</strong></div>
             <div>Transport: <strong id="receiptTransportText">Rs 0</strong></div>
             <div>Unloading: <strong id="receiptUnloadingText">Rs 0</strong></div>
@@ -255,18 +245,15 @@
               </div>
             </div>
             <div class="table-card">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Farmer</th>
-                    <th>Lines</th>
-                    <th>Gross</th>
-                    <th>Deduction</th>
-                    <th>Advance</th>
-                    <th>Net</th>
-                  </tr>
-                </thead>
-                <tbody id="historyTable"></tbody>
+        <table>
+          <thead>
+            <tr>
+              <th>Farmer</th>
+              <th>Lines</th>
+              <th>Net</th>
+            </tr>
+          </thead>
+          <tbody id="historyTable"></tbody>
               </table>
             </div>
           </section>
