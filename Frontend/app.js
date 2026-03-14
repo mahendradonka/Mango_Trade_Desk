@@ -186,6 +186,10 @@ async function apiSetPin(username, pin) {
   return apiPostJson("/api/set-pin", { username, pin });
 }
 
+async function apiDeleteReceipt(id) {
+  return apiPostJson("/api/delete-receipt", { id });
+}
+
 async function initStorage() {
   ensureDate();
   storageMode = await detectBackend();
@@ -460,6 +464,7 @@ function renderHistory() {
         <td>${receipt.lines.length}</td>
         <td>${formatRs(receipt.net)}</td>
         <td><button class="btn ghost" type="button" data-download="${index}">PDF</button></td>
+        <td><button class="btn danger" type="button" data-delete="${index}">Delete</button></td>
       </tr>
     `
     )
@@ -742,6 +747,22 @@ function useFarmerByName(name) {
   elements.farmerSelect.value = farmer.name;
 }
 
+async function deleteReceipt(receipt) {
+  const dateKey = receipt.date || getTodayKey();
+  if (storageMode === "local") {
+    const list = state.receiptsByDate[dateKey] || [];
+    state.receiptsByDate[dateKey] = list.filter((r) => r !== receipt);
+    saveLocalState();
+    renderHistory();
+    return;
+  }
+
+  await apiDeleteReceipt(receipt.id);
+  const list = state.receiptsByDate[dateKey] || [];
+  state.receiptsByDate[dateKey] = list.filter((r) => r.id !== receipt.id);
+  renderHistory();
+}
+
 async function syncPriceInputs() {
   const dateKey = getTodayKey();
   const priceMap = state.pricesByDate[dateKey] || {};
@@ -886,6 +907,19 @@ function bindEvents() {
     }
     const index = target.dataset.download;
     if (index === undefined) {
+      const delIndex = target.dataset.delete;
+      if (delIndex === undefined) {
+        return;
+      }
+      const item = currentHistory[Number(delIndex)];
+      if (!item) {
+        return;
+      }
+      const ok = window.confirm(`Delete receipt for ${item.farmer}?`);
+      if (!ok) {
+        return;
+      }
+      await deleteReceipt(item);
       return;
     }
     const receipt = currentHistory[Number(index)];

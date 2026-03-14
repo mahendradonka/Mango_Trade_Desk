@@ -587,6 +587,14 @@ class MangoHandler(BaseHTTPRequestHandler):
                 )
                 return json_response(self, {"ok": True})
 
+            if parsed.path == "/api/delete-receipt":
+                receipt_id = body.get("id")
+                if not receipt_id:
+                    return json_response(self, {"error": "Missing receipt id"}, status=HTTPStatus.BAD_REQUEST)
+                execute(conn, sql("DELETE FROM receipt_lines WHERE receipt_id = ?"), (receipt_id,))
+                execute(conn, sql("DELETE FROM receipts WHERE id = ?"), (receipt_id,))
+                return json_response(self, {"ok": True})
+
         return json_response(self, {"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
     def handle_static(self, path):
