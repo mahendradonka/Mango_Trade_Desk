@@ -142,6 +142,14 @@
                   Advance paid (Rs)
                   <input type="number" id="advancePaid" min="0" step="1" value="0" />
                 </label>
+                <label>
+                  Transport (Rs)
+                  <input type="number" id="transportCharge" min="0" step="1" value="0" />
+                </label>
+                <label>
+                  Unloading (Rs)
+                  <input type="number" id="unloadingCharge" min="0" step="1" value="0" />
+                </label>
               </div>
 
               <div class="line-items" id="lineItems"></div>
@@ -157,26 +165,87 @@
                     <span>5% deduction</span>
                     <strong id="deductionTotal">Rs 0</strong>
                   </div>
-                  <div class="summary-row">
-                    <span>Advance paid</span>
-                    <strong id="advanceTotal">Rs 0</strong>
-                  </div>
-                </div>
-                <div class="summary-total">
-                  <span>Net payable</span>
-                  <strong id="netTotal">Rs 0</strong>
-                </div>
-              </div>
+            <div class="summary-row">
+              <span>Advance paid</span>
+              <strong id="advanceTotal">Rs 0</strong>
+            </div>
+            <div class="summary-row">
+              <span>Transport</span>
+              <strong id="transportTotal">Rs 0</strong>
+            </div>
+            <div class="summary-row">
+              <span>Unloading</span>
+              <strong id="unloadingTotal">Rs 0</strong>
+            </div>
+          </div>
+          <div class="summary-total">
+            <span>Net payable</span>
+            <strong id="netTotal">Rs 0</strong>
+          </div>
+        </div>
 
-              <div class="receipt-actions">
-                <button class="btn primary" type="submit">Save receipt</button>
-                <button class="btn secondary" type="button" id="printReceipt">Print</button>
-                <button class="btn secondary" type="button" id="sharePdf">Share PDF</button>
-                <button class="btn ghost" type="button" id="shareWhatsapp">Share WhatsApp</button>
-                <button class="btn ghost" type="button" id="shareEmail">Share Email</button>
-              </div>
-            </form>
-          </section>
+        <div class="receipt-actions">
+          <button class="btn primary" type="submit">Save receipt</button>
+          <button class="btn secondary" type="button" id="printReceipt">Print</button>
+          <button class="btn secondary" type="button" id="sharePdf">Share PDF</button>
+          <button class="btn ghost" type="button" id="shareWhatsapp">Share WhatsApp</button>
+          <button class="btn ghost" type="button" id="shareEmail">Share Email</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel receipt-preview">
+      <div class="panel-header">
+        <div>
+          <h2>Receipt preview</h2>
+          <p>This is how the printed receipt will look.</p>
+        </div>
+      </div>
+      <div class="receipt-paper">
+        <div class="receipt-header">
+          <div>
+            <div class="receipt-title">SRI VENKATESWARA FRUITS</div>
+            <div class="receipt-subtitle">Mango's Merchants</div>
+            <div class="receipt-subtitle">At Poultry Farm, Rapaka Village, Tuni Mandal, E.G Dist</div>
+          </div>
+          <div class="receipt-meta">
+            <div>Date: <span id="receiptDateText">--</span></div>
+            <div>Farmer: <span id="receiptFarmerText">--</span></div>
+          </div>
+        </div>
+        <div class="receipt-table-wrap">
+          <table class="receipt-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Grade</th>
+                <th>Crates</th>
+                <th>Avg Wt</th>
+                <th>Total Wt</th>
+                <th>Deduction</th>
+                <th>Net Wt</th>
+                <th>Rate</th>
+                <th>Rs</th>
+              </tr>
+            </thead>
+            <tbody id="receiptPreviewTable"></tbody>
+          </table>
+        </div>
+        <div class="receipt-footer">
+          <div>
+            <div>Gross: <strong id="receiptGrossText">Rs 0</strong></div>
+            <div>Deduction (5%): <strong id="receiptDeductionText">Rs 0</strong></div>
+            <div>Advance: <strong id="receiptAdvanceText">Rs 0</strong></div>
+            <div>Transport: <strong id="receiptTransportText">Rs 0</strong></div>
+            <div>Unloading: <strong id="receiptUnloadingText">Rs 0</strong></div>
+          </div>
+          <div class="receipt-net">
+            Net Payable<br />
+            <span id="receiptNetText">Rs 0</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
           <section class="panel">
             <div class="panel-header">

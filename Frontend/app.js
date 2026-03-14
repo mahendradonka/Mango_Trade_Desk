@@ -22,9 +22,13 @@ const elements = {
   farmerName: document.getElementById("farmerName"),
   farmerPhone: document.getElementById("farmerPhone"),
   advancePaid: document.getElementById("advancePaid"),
+  transportCharge: document.getElementById("transportCharge"),
+  unloadingCharge: document.getElementById("unloadingCharge"),
   grossTotal: document.getElementById("grossTotal"),
   deductionTotal: document.getElementById("deductionTotal"),
   advanceTotal: document.getElementById("advanceTotal"),
+  transportTotal: document.getElementById("transportTotal"),
+  unloadingTotal: document.getElementById("unloadingTotal"),
   netTotal: document.getElementById("netTotal"),
   historyTable: document.getElementById("historyTable"),
   statVarieties: document.getElementById("statVarieties"),
@@ -45,6 +49,15 @@ const elements = {
   currentUser: document.getElementById("currentUser"),
   logoutBtn: document.getElementById("logoutBtn"),
   openPinSettings: document.getElementById("openPinSettings"),
+  receiptPreviewTable: document.getElementById("receiptPreviewTable"),
+  receiptDateText: document.getElementById("receiptDateText"),
+  receiptFarmerText: document.getElementById("receiptFarmerText"),
+  receiptGrossText: document.getElementById("receiptGrossText"),
+  receiptDeductionText: document.getElementById("receiptDeductionText"),
+  receiptAdvanceText: document.getElementById("receiptAdvanceText"),
+  receiptTransportText: document.getElementById("receiptTransportText"),
+  receiptUnloadingText: document.getElementById("receiptUnloadingText"),
+  receiptNetText: document.getElementById("receiptNetText"),
 };
 
 const navButtons = Array.from(document.querySelectorAll(".nav-link"));
@@ -408,22 +421,32 @@ function createLineItem(data) {
 function updateTotals() {
   const lines = Array.from(elements.lineItems.querySelectorAll(".line-item"));
   let gross = 0;
+  let deduction = 0;
 
   lines.forEach((line) => {
     const crates = Number(line.querySelector(".line-crates").value || 0);
     const weight = Number(line.querySelector(".line-weight").value || 0);
     const price = Number(line.querySelector(".line-price").value || 0);
-    gross += crates * weight * price;
+    const grossWeight = crates * weight;
+    const grossMoney = grossWeight * price;
+    const lineDeduction = grossMoney * deductionRate;
+    gross += grossMoney;
+    deduction += lineDeduction;
   });
 
-  const deduction = gross * deductionRate;
   const advance = Number(elements.advancePaid.value || 0);
-  const net = gross - deduction - advance;
+  const transport = Number(elements.transportCharge.value || 0);
+  const unloading = Number(elements.unloadingCharge.value || 0);
+  const net = gross - deduction - advance - transport - unloading;
 
   elements.grossTotal.textContent = formatRs(gross);
   elements.deductionTotal.textContent = formatRs(deduction);
   elements.advanceTotal.textContent = formatRs(advance);
+  elements.transportTotal.textContent = formatRs(transport);
+  elements.unloadingTotal.textContent = formatRs(unloading);
   elements.netTotal.textContent = formatRs(Math.max(net, 0));
+
+  renderReceiptPreview();
 }
 
 function renderHistory() {
@@ -451,6 +474,8 @@ function resetReceiptForm() {
   elements.farmerName.value = "";
   elements.farmerPhone.value = "";
   elements.advancePaid.value = 0;
+  elements.transportCharge.value = 0;
+  elements.unloadingCharge.value = 0;
   elements.farmerSelect.value = "";
   elements.lineItems.innerHTML = "";
   addLine();
@@ -468,14 +493,20 @@ function buildReceiptPayload() {
     const crates = Number(line.querySelector(".line-crates").value || 0);
     const weight = Number(line.querySelector(".line-weight").value || 0);
     const price = Number(line.querySelector(".line-price").value || 0);
-    const total = crates * weight * price;
-    return { variety, grade, crates, weight, price, total };
+    const grossWeight = crates * weight;
+    const deductionWeight = grossWeight * deductionRate;
+    const netWeight = grossWeight - deductionWeight;
+    const totalGross = grossWeight * price;
+    const totalNet = netWeight * price;
+    return { variety, grade, crates, weight, price, grossWeight, deductionWeight, netWeight, totalGross, totalNet };
   });
 
-  const gross = lines.reduce((sum, line) => sum + line.total, 0);
-  const deduction = gross * deductionRate;
+  const gross = lines.reduce((sum, line) => sum + line.totalGross, 0);
+  const deduction = lines.reduce((sum, line) => sum + (line.totalGross - line.totalNet), 0);
   const advance = Number(elements.advancePaid.value || 0);
-  const net = Math.max(gross - deduction - advance, 0);
+  const transport = Number(elements.transportCharge.value || 0);
+  const unloading = Number(elements.unloadingCharge.value || 0);
+  const net = Math.max(gross - deduction - advance - transport - unloading, 0);
 
   return {
     farmer: elements.farmerName.value.trim() || "Unknown",
@@ -485,6 +516,8 @@ function buildReceiptPayload() {
     gross,
     deduction,
     advance,
+    transport,
+    unloading,
     net,
   };
 }
@@ -493,7 +526,7 @@ function receiptToText(receipt) {
   const lines = receipt.lines
     .map(
       (line) =>
-        `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg x Rs${line.price} = Rs${line.total.toFixed(0)}`
+        `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${line.netWeight.toFixed(2)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`
     )
     .join("\n");
 
@@ -507,10 +540,51 @@ function receiptToText(receipt) {
     `Gross: Rs${receipt.gross.toFixed(0)}`,
     `Deduction (5%): Rs${receipt.deduction.toFixed(0)}`,
     `Advance: Rs${receipt.advance.toFixed(0)}`,
+    `Transport: Rs${receipt.transport.toFixed(0)}`,
+    `Unloading: Rs${receipt.unloading.toFixed(0)}`,
     `Net Payable: Rs${receipt.net.toFixed(0)}`,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function renderReceiptPreview() {
+  const receipt = buildReceiptPayload();
+  elements.receiptDateText.textContent = receipt.date;
+  elements.receiptFarmerText.textContent = receipt.farmer;
+  elements.receiptGrossText.textContent = formatRs(receipt.gross);
+  elements.receiptDeductionText.textContent = formatRs(receipt.deduction);
+  elements.receiptAdvanceText.textContent = formatRs(receipt.advance);
+  elements.receiptTransportText.textContent = formatRs(receipt.transport);
+  elements.receiptUnloadingText.textContent = formatRs(receipt.unloading);
+  elements.receiptNetText.textContent = formatRs(receipt.net);
+
+  if (!receipt.lines.length) {
+    elements.receiptPreviewTable.innerHTML = `
+      <tr>
+        <td colspan="9">No line items yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  elements.receiptPreviewTable.innerHTML = receipt.lines
+    .map(
+      (line, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${line.grade}</td>
+        <td>${line.crates}</td>
+        <td>${line.weight}</td>
+        <td>${line.grossWeight.toFixed(2)}</td>
+        <td>${line.deductionWeight.toFixed(2)}</td>
+        <td>${line.netWeight.toFixed(2)}</td>
+        <td>${line.price}</td>
+        <td>${line.totalNet.toFixed(0)}</td>
+      </tr>
+    `
+    )
+    .join("");
 }
 
 function buildReceiptPdf(receipt) {
@@ -541,7 +615,7 @@ function buildReceiptPdf(receipt) {
   doc.setFont("helvetica", "normal");
 
   receipt.lines.forEach((line) => {
-    const row = `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg x Rs${line.price} = Rs${line.total.toFixed(0)}`;
+    const row = `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${line.netWeight.toFixed(2)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`;
     const split = doc.splitTextToSize(row, 520);
     doc.text(split, left, y);
     y += split.length * 14 + 6;
@@ -558,6 +632,10 @@ function buildReceiptPdf(receipt) {
   doc.text(`Deduction (5%): Rs${receipt.deduction.toFixed(0)}`, left, y);
   y += 16;
   doc.text(`Advance: Rs${receipt.advance.toFixed(0)}`, left, y);
+  y += 16;
+  doc.text(`Transport: Rs${receipt.transport.toFixed(0)}`, left, y);
+  y += 16;
+  doc.text(`Unloading: Rs${receipt.unloading.toFixed(0)}`, left, y);
   y += 16;
   doc.text(`Net Payable: Rs${receipt.net.toFixed(0)}`, left, y);
 
@@ -739,6 +817,8 @@ function bindEvents() {
 
   elements.addLineBtn.addEventListener("click", addLine);
   elements.advancePaid.addEventListener("input", updateTotals);
+  elements.transportCharge.addEventListener("input", updateTotals);
+  elements.unloadingCharge.addEventListener("input", updateTotals);
 
   elements.receiptForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -823,6 +903,7 @@ function bindEvents() {
       elements.loginOverlay.style.display = "none";
       elements.loginNote.textContent = "";
       elements.loginPin.value = "";
+      renderReceiptPreview();
     } catch (err) {
       if (storageMode === "api") {
         elements.loginNote.textContent = "Backend not reachable. Start the server and refresh.";
@@ -882,6 +963,7 @@ async function hydrate() {
   renderPriceTable();
   resetReceiptForm();
   renderHistory();
+  renderReceiptPreview();
 
   const storedAuth = storageMode === "local" ? localStorage.getItem("mangoDeskAuth") : null;
   const auth = storageMode === "local" ? loadLocalAuth() : { username: "admin" };
