@@ -49,6 +49,9 @@ SQLITE_SCHEMA = [
         farmer TEXT NOT NULL,
         phone TEXT,
         advance REAL NOT NULL,
+        transport REAL NOT NULL,
+        unloading REAL NOT NULL,
+        subtotal REAL NOT NULL,
         gross REAL NOT NULL,
         deduction REAL NOT NULL,
         net REAL NOT NULL,
@@ -108,6 +111,9 @@ POSTGRES_SCHEMA = [
         farmer TEXT NOT NULL,
         phone TEXT,
         advance DOUBLE PRECISION NOT NULL,
+        transport DOUBLE PRECISION NOT NULL,
+        unloading DOUBLE PRECISION NOT NULL,
+        subtotal DOUBLE PRECISION NOT NULL,
         gross DOUBLE PRECISION NOT NULL,
         deduction DOUBLE PRECISION NOT NULL,
         net DOUBLE PRECISION NOT NULL,
@@ -166,10 +172,25 @@ def init_db():
             with conn.cursor() as cur:
                 for stmt in statements:
                     cur.execute(stmt)
+                cur.execute("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS transport DOUBLE PRECISION NOT NULL DEFAULT 0")
+                cur.execute("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS unloading DOUBLE PRECISION NOT NULL DEFAULT 0")
+                cur.execute("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS subtotal DOUBLE PRECISION NOT NULL DEFAULT 0")
             conn.commit()
         else:
             for stmt in statements:
                 conn.execute(stmt)
+            try:
+                conn.execute("ALTER TABLE receipts ADD COLUMN transport REAL NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE receipts ADD COLUMN unloading REAL NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE receipts ADD COLUMN subtotal REAL NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
             conn.commit()
 
 
@@ -222,14 +243,17 @@ def insert_receipt(conn, payload):
         with conn.cursor() as cur:
             cur.execute(
                 sql(
-                    "INSERT INTO receipts (date, farmer, phone, advance, gross, deduction, net, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+                    "INSERT INTO receipts (date, farmer, phone, advance, transport, unloading, subtotal, gross, deduction, net, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
                 ),
                 (
                     payload["date"],
                     payload["farmer"],
                     payload["phone"],
                     payload["advance"],
+                    payload["transport"],
+                    payload["unloading"],
+                    payload["subtotal"],
                     payload["gross"],
                     payload["deduction"],
                     payload["net"],
@@ -241,13 +265,16 @@ def insert_receipt(conn, payload):
         return receipt_id
 
     cur = conn.execute(
-        "INSERT INTO receipts (date, farmer, phone, advance, gross, deduction, net, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO receipts (date, farmer, phone, advance, transport, unloading, subtotal, gross, deduction, net, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             payload["date"],
             payload["farmer"],
             payload["phone"],
             payload["advance"],
+            payload["transport"],
+            payload["unloading"],
+            payload["subtotal"],
             payload["gross"],
             payload["deduction"],
             payload["net"],
@@ -258,15 +285,24 @@ def insert_receipt(conn, payload):
     return cur.lastrowid
 
 
-def compute_totals(lines, advance):
+def compute_totals(lines):
     computed = []
     gross = 0.0
+    deduction = 0.0
+    subtotal = 0.0
     for line in lines:
         crates = float(line.get("crates", 0))
         weight = float(line.get("weight", 0))
         price = float(line.get("price", 0))
-        total = crates * weight * price
-        gross += total
+        gross_weight = crates * weight
+        deduction_weight = gross_weight * DEDUCTION_RATE
+        net_weight = max(gross_weight - deduction_weight, 0.0)
+        net_weight_floor = float(int(net_weight))
+        total_gross = gross_weight * price
+        total_net = net_weight_floor * price
+        gross += total_gross
+        deduction += total_gross - total_net
+        subtotal += total_net
         computed.append(
             {
                 "variety": line.get("variety", ""),
@@ -274,12 +310,10 @@ def compute_totals(lines, advance):
                 "crates": int(crates),
                 "weight": float(weight),
                 "price": float(price),
-                "total": float(total),
+                "total": float(total_net),
             }
         )
-    deduction = gross * DEDUCTION_RATE
-    net = max(gross - deduction - advance, 0.0)
-    return computed, gross, deduction, net
+    return computed, gross, deduction, subtotal
 
 
 class MangoHandler(BaseHTTPRequestHandler):
@@ -331,7 +365,7 @@ class MangoHandler(BaseHTTPRequestHandler):
                 receipts = fetch_all(
                     conn,
                     sql(
-                        "SELECT id, date, farmer, phone, advance, gross, deduction, net "
+                        "SELECT id, date, farmer, phone, advance, transport, unloading, subtotal, gross, deduction, net "
                         "FROM receipts WHERE date = ? ORDER BY id DESC"
                     ),
                     (date,),
@@ -366,6 +400,9 @@ class MangoHandler(BaseHTTPRequestHandler):
                             "farmer": receipt["farmer"],
                             "phone": receipt["phone"],
                             "advance": receipt["advance"],
+                            "transport": receipt.get("transport", 0) if IS_POSTGRES else receipt["transport"],
+                            "unloading": receipt.get("unloading", 0) if IS_POSTGRES else receipt["unloading"],
+                            "subtotal": receipt.get("subtotal", 0) if IS_POSTGRES else receipt["subtotal"],
                             "gross": receipt["gross"],
                             "deduction": receipt["deduction"],
                             "net": receipt["net"],
@@ -430,17 +467,23 @@ class MangoHandler(BaseHTTPRequestHandler):
                 farmer = (body.get("farmer") or "Unknown").strip()
                 phone = (body.get("phone") or "").strip()
                 advance = float(body.get("advance", 0))
+                transport = float(body.get("transport", 0))
+                unloading = float(body.get("unloading", 0))
                 lines = body.get("lines") or []
                 if not date or not lines:
                     return json_response(self, {"error": "Missing data"}, status=HTTPStatus.BAD_REQUEST)
 
-                computed_lines, gross, deduction, net = compute_totals(lines, advance)
+                computed_lines, gross, deduction, subtotal = compute_totals(lines)
+                net = max(subtotal - advance - transport - unloading, 0.0)
                 created_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
                 receipt_payload = {
                     "date": date,
                     "farmer": farmer,
                     "phone": phone,
                     "advance": advance,
+                    "transport": transport,
+                    "unloading": unloading,
+                    "subtotal": subtotal,
                     "gross": gross,
                     "deduction": deduction,
                     "net": net,
@@ -474,6 +517,9 @@ class MangoHandler(BaseHTTPRequestHandler):
                         "farmer": farmer,
                         "phone": phone,
                         "advance": advance,
+                        "transport": transport,
+                        "unloading": unloading,
+                        "subtotal": subtotal,
                         "gross": gross,
                         "deduction": deduction,
                         "net": net,

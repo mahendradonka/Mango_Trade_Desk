@@ -79,6 +79,7 @@ let state = {
 
 let currentUser = null;
 const defaultAuth = { username: "admin", pin: "1234" };
+let currentHistory = [];
 
 function getTodayKey() {
   return elements.priceDate.value || new Date().toISOString().slice(0, 10);
@@ -449,13 +450,16 @@ function updateTotals() {
 function renderHistory() {
   const dateKey = getTodayKey();
   const receipts = state.receiptsByDate[dateKey] || [];
-  elements.historyTable.innerHTML = receipts
+  currentHistory = receipts.map((receipt) => normalizeReceipt(receipt));
+  elements.historyTable.innerHTML = currentHistory
     .map(
-      (receipt) => `
+      (receipt, index) => `
       <tr>
+        <td>${receipt.date || dateKey}</td>
         <td>${receipt.farmer}</td>
         <td>${receipt.lines.length}</td>
         <td>${formatRs(receipt.net)}</td>
+        <td><button class="btn ghost" type="button" data-download="${index}">PDF</button></td>
       </tr>
     `
     )
@@ -519,8 +523,49 @@ function buildReceiptPayload() {
   };
 }
 
+function normalizeReceipt(receipt) {
+  const safe = {
+    ...receipt,
+    advance: Number(receipt.advance || 0),
+    transport: Number(receipt.transport || 0),
+    unloading: Number(receipt.unloading || 0),
+    lines: Array.isArray(receipt.lines) ? receipt.lines : [],
+  };
+
+  const lines = safe.lines.map((line) => {
+    const crates = Number(line.crates || 0);
+    const weight = Number(line.weight || 0);
+    const price = Number(line.price || 0);
+    const grossWeight = crates * weight;
+    const deductionWeight = grossWeight * deductionRate;
+    const netWeight = Math.floor(grossWeight - deductionWeight);
+    const totalNet = netWeight * price;
+    return {
+      ...line,
+      crates,
+      weight,
+      price,
+      grossWeight,
+      deductionWeight,
+      netWeight,
+      totalNet,
+    };
+  });
+
+  const subtotal = lines.reduce((sum, line) => sum + line.totalNet, 0);
+  const net = Math.max(subtotal - safe.advance - safe.transport - safe.unloading, 0);
+
+  return {
+    ...safe,
+    lines,
+    subtotal,
+    net,
+  };
+}
+
 function receiptToText(receipt) {
-  const lines = receipt.lines
+  const normalized = normalizeReceipt(receipt);
+  const lines = normalized.lines
     .map(
       (line) =>
         `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${formatWeight0(line.netWeight)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`
@@ -528,23 +573,23 @@ function receiptToText(receipt) {
     .join("\n");
 
   return [
-    `Mango Receipt - ${receipt.date}`,
-    `Farmer: ${receipt.farmer}`,
-    receipt.phone ? `Phone: ${receipt.phone}` : null,
+    `Mango Receipt - ${normalized.date}`,
+    `Farmer: ${normalized.farmer}`,
+    normalized.phone ? `Phone: ${normalized.phone}` : null,
     "",
     lines,
     "",
-    `Advance: Rs${receipt.advance.toFixed(0)}`,
-    `Transport: Rs${receipt.transport.toFixed(0)}`,
-    `Unloading: Rs${receipt.unloading.toFixed(0)}`,
-    `Net Payable: Rs${receipt.net.toFixed(0)}`,
+    `Advance: Rs${normalized.advance.toFixed(0)}`,
+    `Transport: Rs${normalized.transport.toFixed(0)}`,
+    `Unloading: Rs${normalized.unloading.toFixed(0)}`,
+    `Net Payable: Rs${normalized.net.toFixed(0)}`,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
 function renderReceiptPreview() {
-  const receipt = buildReceiptPayload();
+  const receipt = normalizeReceipt(buildReceiptPayload());
   elements.receiptDateText.textContent = receipt.date;
   elements.receiptFarmerText.textContent = receipt.farmer;
   elements.receiptAdvanceText.textContent = formatRs(receipt.advance);
@@ -582,6 +627,7 @@ function renderReceiptPreview() {
 }
 
 function buildReceiptPdf(receipt) {
+  const normalized = normalizeReceipt(receipt);
   const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
   const left = 40;
   let y = 50;
@@ -593,12 +639,12 @@ function buildReceiptPdf(receipt) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
-  doc.text(`Date: ${receipt.date}`, left, y);
+  doc.text(`Date: ${normalized.date}`, left, y);
   y += 18;
-  doc.text(`Farmer: ${receipt.farmer}`, left, y);
+  doc.text(`Farmer: ${normalized.farmer}`, left, y);
   y += 18;
-  if (receipt.phone) {
-    doc.text(`Phone: ${receipt.phone}`, left, y);
+  if (normalized.phone) {
+    doc.text(`Phone: ${normalized.phone}`, left, y);
     y += 18;
   }
 
@@ -624,7 +670,7 @@ function buildReceiptPdf(receipt) {
   drawRow(headers, y);
   y += 22;
 
-  receipt.lines.forEach((line, index) => {
+  normalized.lines.forEach((line, index) => {
     const row = [
       index + 1,
       line.variety,
@@ -649,13 +695,13 @@ function buildReceiptPdf(receipt) {
 
   y += 10;
   doc.setFont("helvetica", "bold");
-  doc.text(`Advance: Rs${receipt.advance.toFixed(0)}`, left, y);
+  doc.text(`Advance: Rs${normalized.advance.toFixed(0)}`, left, y);
   y += 16;
-  doc.text(`Transport: Rs${receipt.transport.toFixed(0)}`, left, y);
+  doc.text(`Transport: Rs${normalized.transport.toFixed(0)}`, left, y);
   y += 16;
-  doc.text(`Unloading: Rs${receipt.unloading.toFixed(0)}`, left, y);
+  doc.text(`Unloading: Rs${normalized.unloading.toFixed(0)}`, left, y);
   y += 16;
-  doc.text(`Net Payable: Rs${receipt.net.toFixed(0)}`, left, y);
+  doc.text(`Net Payable: Rs${normalized.net.toFixed(0)}`, left, y);
 
   return doc;
 }
@@ -831,6 +877,21 @@ function bindEvents() {
       return;
     }
     useFarmerByName(elements.farmerSelect.value);
+  });
+
+  elements.historyTable.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const index = target.dataset.download;
+    if (index === undefined) {
+      return;
+    }
+    const receipt = currentHistory[Number(index)];
+    if (receipt) {
+      await shareOrDownloadPdf(receipt);
+    }
   });
 
   elements.addLineBtn.addEventListener("click", addLine);
