@@ -266,6 +266,14 @@ function formatRs(value) {
   return `Rs ${value.toFixed(0)}`;
 }
 
+function formatWeight4(value) {
+  return Number(value).toFixed(4);
+}
+
+function formatWeight0(value) {
+  return Math.floor(Number(value)).toString();
+}
+
 function renderVarietyTable() {
   elements.varietyTable.innerHTML = state.varieties
     .map(
@@ -419,25 +427,13 @@ function createLineItem(data) {
 }
 
 function updateTotals() {
-  const lines = Array.from(elements.lineItems.querySelectorAll(".line-item"));
-  let gross = 0;
-  let deduction = 0;
-
-  lines.forEach((line) => {
-    const crates = Number(line.querySelector(".line-crates").value || 0);
-    const weight = Number(line.querySelector(".line-weight").value || 0);
-    const price = Number(line.querySelector(".line-price").value || 0);
-    const grossWeight = crates * weight;
-    const grossMoney = grossWeight * price;
-    const lineDeduction = grossMoney * deductionRate;
-    gross += grossMoney;
-    deduction += lineDeduction;
-  });
-
-  const advance = Number(elements.advancePaid.value || 0);
-  const transport = Number(elements.transportCharge.value || 0);
-  const unloading = Number(elements.unloadingCharge.value || 0);
-  const net = gross - deduction - advance - transport - unloading;
+  const receipt = buildReceiptPayload();
+  const gross = receipt.gross;
+  const deduction = receipt.deduction;
+  const advance = receipt.advance;
+  const transport = receipt.transport;
+  const unloading = receipt.unloading;
+  const net = receipt.net;
 
   elements.grossTotal.textContent = formatRs(gross);
   elements.deductionTotal.textContent = formatRs(deduction);
@@ -495,7 +491,8 @@ function buildReceiptPayload() {
     const price = Number(line.querySelector(".line-price").value || 0);
     const grossWeight = crates * weight;
     const deductionWeight = grossWeight * deductionRate;
-    const netWeight = grossWeight - deductionWeight;
+    const netWeightRaw = grossWeight - deductionWeight;
+    const netWeight = Math.floor(netWeightRaw);
     const totalGross = grossWeight * price;
     const totalNet = netWeight * price;
     return { variety, grade, crates, weight, price, grossWeight, deductionWeight, netWeight, totalGross, totalNet };
@@ -526,7 +523,7 @@ function receiptToText(receipt) {
   const lines = receipt.lines
     .map(
       (line) =>
-        `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${line.netWeight.toFixed(2)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`
+        `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${formatWeight0(line.netWeight)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`
     )
     .join("\n");
 
@@ -575,10 +572,10 @@ function renderReceiptPreview() {
         <td>${index + 1}</td>
         <td>${line.grade}</td>
         <td>${line.crates}</td>
-        <td>${line.weight}</td>
-        <td>${line.grossWeight.toFixed(2)}</td>
-        <td>${line.deductionWeight.toFixed(2)}</td>
-        <td>${line.netWeight.toFixed(2)}</td>
+        <td>${formatWeight4(line.weight)}</td>
+        <td>${formatWeight4(line.grossWeight)}</td>
+        <td>${formatWeight4(line.deductionWeight)}</td>
+        <td>${formatWeight0(line.netWeight)}</td>
         <td>${line.price}</td>
         <td>${line.totalNet.toFixed(0)}</td>
       </tr>
@@ -614,14 +611,41 @@ function buildReceiptPdf(receipt) {
   y += 16;
   doc.setFont("helvetica", "normal");
 
-  receipt.lines.forEach((line) => {
-    const row = `${line.variety} (${line.grade}) - ${line.crates} crates x ${line.weight}kg = Net ${line.netWeight.toFixed(2)}kg x Rs${line.price} = Rs${line.totalNet.toFixed(0)}`;
-    const split = doc.splitTextToSize(row, 520);
-    doc.text(split, left, y);
-    y += split.length * 14 + 6;
-    if (y > 760) {
+  const colWidths = [28, 42, 44, 58, 62, 60, 52, 46, 56];
+  const headers = ["No", "Grade", "Crates", "Avg Wt", "Total", "Deduct", "Net", "Rate", "Rs"];
+
+  const drawRow = (row, rowY, isHeader = false) => {
+    let x = left;
+    doc.setFont("helvetica", isHeader ? "bold" : "normal");
+    row.forEach((cell, idx) => {
+      doc.rect(x, rowY - 12, colWidths[idx], 18);
+      doc.text(String(cell), x + 4, rowY);
+      x += colWidths[idx];
+    });
+  };
+
+  drawRow(headers, y);
+  y += 22;
+
+  receipt.lines.forEach((line, index) => {
+    const row = [
+      index + 1,
+      line.grade,
+      line.crates,
+      formatWeight4(line.weight),
+      formatWeight4(line.grossWeight),
+      formatWeight4(line.deductionWeight),
+      formatWeight0(line.netWeight),
+      line.price,
+      line.totalNet.toFixed(0),
+    ];
+    drawRow(row, y);
+    y += 22;
+    if (y > 740) {
       doc.addPage();
       y = 50;
+      drawRow(headers, y);
+      y += 22;
     }
   });
 
